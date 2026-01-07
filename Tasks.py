@@ -36,7 +36,7 @@ def get_cost_at_hour(hour, tariff_model):
 
 
 
-def simulate(tasks_list, strategy="EDF",tariff_model=3):
+def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
     current_time = 0
     completed_tasks = []
     active_tasks = []
@@ -68,15 +68,27 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3):
 
             current_task = active_tasks[0]
             
-            # 3. Calcul du coût (basé sur la Figure 1 de votre document)
-            cost_multiplier = get_cost_at_hour(current_time, tariff_model)
-            total_cost += cost_multiplier
-            
-            # 4. Exécuter
-            current_task.remaining_time -= 1
-            if current_task.remaining_time == 0:
-                active_tasks.remove(current_task)
-                completed_tasks.append(current_task)
+
+            current_price = get_cost_at_hour(current_time, tariff_model)
+            laxity = current_task.get_laxity(current_time)
+            #Econoime de coût si on peut retarder l'exécution
+            if cost_opt and current_price >= 2 and laxity > 0:
+                
+                pass
+
+            else:   
+                # 3. Calcul du coût (basé sur la Figure 1 de votre document)
+                cost_multiplier = get_cost_at_hour(current_time, tariff_model)
+                total_cost += cost_multiplier
+                
+                # 4. Exécuter
+                current_task.remaining_time -= 1
+                if current_task.remaining_time == 0:
+                    active_tasks.remove(current_task)
+                    completed_tasks.append(current_task)
+
+
+
 
         current_time += 1
     print("End time:", current_time)
@@ -96,6 +108,10 @@ tasks_list = [
     Task("T9", arrival_time=7, execution_time=4, deadline=16)
 ]
 
-print("Total cost with EDF:", simulate(copy.deepcopy(tasks_list),strategy="EDF", tariff_model=3))
+l1=copy.deepcopy(tasks_list)
+l2=copy.deepcopy(tasks_list)
 
-print("Total cost with LLF:", simulate(copy.deepcopy(tasks_list),strategy="LLF", tariff_model=3))
+
+print("Total cost with EDF:", simulate(l1,strategy="EDF", tariff_model=3,cost_opt=False))
+
+print("Total cost with LLF:", simulate(l2,strategy="LLF", tariff_model=3,cost_opt=False))
