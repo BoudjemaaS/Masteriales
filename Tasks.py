@@ -12,4 +12,69 @@ class Task:
         return (self.deadline - current_time) - self.remaining_time
     
 
-   
+def get_cost_at_hour(t):
+
+    # 0h-7h: OffPeak, 7h-11h: MidPeak, 11h-17h: Peak, 17h-20h: MidPeak, 20h-24h: OffPeak
+    hour = t % 24
+    if 11 <= hour < 17: return 3 # Peak
+    if 7 <= hour < 11 or 17 <= hour < 20: return 2 # MidPeak
+    return 1 # OffPeak
+
+
+def simulate(tasks_list, strategy="EDF"):
+    current_time = 0
+    completed_tasks = []
+    active_tasks = []
+    total_cost = 0
+    
+    # Simulation pas à pas
+    while tasks_list or active_tasks:
+        
+        # 1. Ajouter les tâches qui viennent d'arriver
+        new_arrivals = [t for t in tasks_list if t.arrival_time == current_time]
+        active_tasks.extend(new_arrivals)
+        for t in new_arrivals: tasks_list.remove(t)
+
+        if active_tasks:
+            # 2. Choisir la tâche selon la stratégie
+            if strategy == "EDF":
+                active_tasks.sort(key=lambda x: x.deadline)
+            elif strategy == "LLF":
+                active_tasks.sort(key=lambda x: x.get_laxity(current_time))
+
+            current_task = active_tasks[0]
+            
+            # 3. Calcul du coût (basé sur la Figure 1 de votre document)
+            cost_multiplier = get_cost_at_hour(current_time)
+            total_cost += cost_multiplier
+            
+            # 4. Exécuter
+            current_task.remaining_time -= 1
+            if current_task.remaining_time == 0:
+                active_tasks.remove(current_task)
+                completed_tasks.append(current_task)
+
+        current_time += 1
+    print("end time:", current_time)
+    return total_cost
+    
+    
+tasks_list = [
+    Task("T1", arrival_time=0, execution_time=4, deadline=10),
+    Task("T2", arrival_time=2, execution_time=3, deadline=8),
+    Task("T3", arrival_time=4, execution_time=2, deadline=12),
+    Task("T4", arrival_time=6, execution_time=1, deadline=9),
+    Task("T5", arrival_time=8, execution_time=2, deadline=15)
+]
+
+print("Total cost with EDF:", simulate(tasks_list.copy(), strategy="EDF"))
+
+tasks_list = [
+    Task("T1", arrival_time=0, execution_time=4, deadline=10),
+    Task("T2", arrival_time=2, execution_time=3, deadline=8),
+    Task("T3", arrival_time=4, execution_time=2, deadline=12),
+    Task("T4", arrival_time=6, execution_time=1, deadline=9),
+    Task("T5", arrival_time=8, execution_time=2, deadline=15)
+]
+
+print("Total cost with LLF:", simulate(tasks_list.copy(), strategy="LLF"))
