@@ -36,7 +36,7 @@ def get_cost_at_hour(hour, tariff_model):
         #hour = t % 24
         if 11 <= hour < 17: 
             price = 3 # Peak
-        if 7 <= hour < 11 or 17 <= hour < 20: 
+        elif 7 <= hour < 11 or 17 <= hour < 20: 
             price = 2 # MidPeak
         else:
             price = 1 # OffPeak
@@ -44,22 +44,23 @@ def get_cost_at_hour(hour, tariff_model):
     return price/60  # Convertir en coût par minute
 
 
+def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
+    #Algorithme d'ordonnancement glouton avec optimisation de coût optionnelle
 
-def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
-    current_time = 0
-    completed_tasks = []
-    active_tasks = []
-    failed_tasks = []
-    total_cost = 0
-    total_inital_tasks = len(tasks_list)
-    history = []
+    current_time = 0 #Début de la simulation
+    completed_tasks = [] #Liste des tâches complétées
+    active_tasks = [] #Liste des tâches actives
+    failed_tasks = [] #Liste des tâches échouées
+    total_cost = 0 #Coût total de l'ordonnancement 
+    total_inital_tasks = len(tasks_list) #Nombre total de tâches initiales
+    history = [] #Historique des taches pour le diagramme de Gantt
     start_loop_time = time.time()
     
     # Simulation pas à pas
     while tasks_list or active_tasks:
         
-        # 1. Ajouter les tâches qui viennent d'arriver
-        new_arrivals = [t for t in tasks_list if t.arrival_time == current_time]
+        #Ajout des tâches qui viennent d'arriver
+        new_arrivals = [t for t in tasks_list if t.arrival_time == current_time] #Tâches arrivant à l'instant t
         active_tasks.extend(new_arrivals)
         for t in new_arrivals: tasks_list.remove(t)
 
@@ -71,7 +72,7 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
             active_tasks.remove(t)
 
         if active_tasks:
-            # 2. Choisir la tâche selon la stratégie
+            #Trier et choisir la tâche selon la stratégie
             if strategy == "EDF":
                 active_tasks.sort(key=lambda x: x.deadline)
             elif strategy == "LLF":
@@ -82,21 +83,23 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
 
             current_price = get_cost_at_hour(current_time, tariff_model)
             laxity = current_task.get_laxity(current_time)
+
             #Econoime de coût si on peut retarder l'exécution
             if not cost_opt or current_price < 2/60 or laxity == 0:
                 
                 history.append((current_time, current_task.name, current_price))
-                # 3. Calcul du coût (basé sur la Figure 1 de votre document)
+                #Ajout du coût (par minute)
                 cost_multiplier = get_cost_at_hour(current_time, tariff_model)
                 total_cost += cost_multiplier
                 
-                # 4. Exécuter
+                #Exécution de la tâche pendant une unité de temps
                 current_task.remaining_time -= 1
                 if current_task.remaining_time == 0:
                     active_tasks.remove(current_task)
                     completed_tasks.append(current_task)
 
         current_time += 1
+
     print("Simulation completed in", time.time() - start_loop_time, "seconds.")
     print("End time:", round(current_time/60,2), "hours")
     print("Total cost:", round (total_cost,2))
@@ -105,6 +108,70 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
     return history
     
     
+def simulate_rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=120):
+    current_time = 0
+    completed_tasks = []
+    active_tasks = []
+    failed_tasks = []
+    total_cost = 0
+    total_initial = len(tasks_list)
+    history = []
+    
+    while tasks_list or active_tasks:
+        #Arrivée des tâches
+        new_arrivals = [t for t in tasks_list if t.arrival_time == current_time]
+        active_tasks.extend(new_arrivals)
+        for t in new_arrivals: tasks_list.remove(t)
+
+        # Nettoyage des échecs
+        missed = [t for t in active_tasks if (current_time + t.remaining_time) > t.deadline]
+        for t in missed:
+            failed_tasks.append(t)
+            active_tasks.remove(t)
+
+        if active_tasks:
+            # Tri selon la stratégie
+            if strategy == "EDF":
+                active_tasks.sort(key=lambda x: x.deadline)
+            elif strategy == "LLF":
+                active_tasks.sort(key=lambda x: x.get_laxity(current_time))
+
+            current_task = active_tasks[0]
+            
+            
+            # On regarde le prix futur dans l'horizon choisi
+            current_price = get_cost_at_hour(current_time, tariff_model)
+            
+            # On cherche s'il y a un prix plus bas dans l'horizon
+            future_prices = [get_cost_at_hour(current_time + offset, tariff_model) 
+                             for offset in range(1, horizon_minutes + 1)]
+            min_future_price = min(future_prices)
+            
+            laxity = current_task.get_laxity(current_time)
+
+            # DÉCISION : On exécute si :
+            # - On est déjà au prix minimum de l'horizon
+            # - OU la laxité est nulle (Urgence absolue)
+            # - OU le prix actuel est acceptable (OffPeak)
+            if current_price <= min_future_price or laxity == 0 or current_price <= (1/60):
+                # Exécution
+                total_cost += current_price
+                current_task.remaining_time -= 1
+                history.append((current_time, current_task.name, current_price * 60))
+                
+                if current_task.remaining_time == 0:
+                    active_tasks.remove(current_task)
+                    completed_tasks.append(current_task)
+            
+
+        current_time += 1
+        
+
+    print("End time:", round(current_time/60,2), "hours")
+    print("Total cost:", round (total_cost,2))
+    print("Completed tasks:" , len(completed_tasks)/total_initial * 100, "%")
+
+    return history
 
 def plot_gantt(history):
     import matplotlib.pyplot as plt
@@ -149,18 +216,10 @@ tasks_list = [
 ]
 
 
-
 l1=copy.deepcopy(tasks_list)
 l2=copy.deepcopy(tasks_list)
 
+plot_gantt(greedy(l1, strategy="EDF", tariff_model=3, cost_opt=True))
+plot_gantt(simulate_rolling_horizon(l2, strategy="EDF", tariff_model=3, horizon_minutes=120))
 
-#plot_gantt(simulate(l1,strategy="EDF", tariff_model=3,cost_opt=False))
 
-#print("Total cost with LLF:", simulate(l2,strategy="LLF", tariff_model=3,cost_opt=False))
-
-#plot_gantt(simulate(l1,strategy="EDF", tariff_model=3,cost_opt=True))
-
-#plot_gantt(simulate(l2,strategy="LLF", tariff_model=3,cost_opt=True))
-
-plot_gantt(simulate(l1,strategy="EDF", tariff_model=3,cost_opt=False))
-plot_gantt(simulate(l2,strategy="LLF", tariff_model=3,cost_opt=False))
