@@ -1,38 +1,47 @@
 
 import copy
+import time
 
 
 class Task:
     def __init__(self, name, arrival_time, execution_time, deadline):
         self.name = name # Nom de la tâche
-        self.arrival_time = arrival_time # Date d'arrivée de la tâche
-        self.execution_time = execution_time # Temps d'exécution total de la tâche
-        self.remaining_time = execution_time # Temps d'exécution restant
-        self.deadline = deadline # Échéance de la tâche
+        self.arrival_time = round(arrival_time * 60,2) # Date d'arrivée de la tâche
+        self.execution_time = round(execution_time * 60,2)  # Temps d'exécution total de la tâche
+        self.remaining_time = round(execution_time * 60,2) # Temps d'exécution restant
+        self.deadline = round(deadline * 60,2) # Échéance de la tâche
 
     def get_laxity(self, current_time):
         # Laxité = (Échéance - Temps actuel) - Temps d'exécution restant
         # Correspond au temps disponible avant l'échéance après avoir pris en compte le temps d'exécution restant
-        return (self.deadline - current_time) - self.remaining_time
+        return round(((self.deadline - current_time) - self.remaining_time),2)   
     
 
 def get_cost_at_hour(hour, tariff_model):
 
+    hour = round(hour/60, 2)  # Convertir en heures
+    price = 0
 
     if tariff_model == 2:
         #7h-11h & 17h-21h: Peak, autres: OffPeak
         #hour = t % 24
-        if 7 <= hour < 11 or 17 <= hour < 21: return 3 # Peak
-        return 1 # OffPeak
+        if 7 <= hour < 11 or 17 <= hour < 21:
+            price = 3 # Peak
+
+        else:
+            price = 1 # OffPeak
 
     else:
         # 0h-7h: OffPeak, 7h-11h: MidPeak, 11h-17h: Peak, 17h-20h: MidPeak, 20h-24h: OffPeak
         #hour = t % 24
-        if 11 <= hour < 17: return 3 # Peak
-        if 7 <= hour < 11 or 17 <= hour < 20: return 2 # MidPeak
-        return 1 # OffPeak
+        if 11 <= hour < 17: 
+            price = 3 # Peak
+        if 7 <= hour < 11 or 17 <= hour < 20: 
+            price = 2 # MidPeak
+        else:
+            price = 1 # OffPeak
 
-
+    return price/60  # Convertir en coût par minute
 
 
 
@@ -43,6 +52,8 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
     failed_tasks = []
     total_cost = 0
     total_inital_tasks = len(tasks_list)
+    history = []
+    start_loop_time = time.time()
     
     # Simulation pas à pas
     while tasks_list or active_tasks:
@@ -72,11 +83,9 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
             current_price = get_cost_at_hour(current_time, tariff_model)
             laxity = current_task.get_laxity(current_time)
             #Econoime de coût si on peut retarder l'exécution
-            if cost_opt and current_price >= 2 and laxity > 0:
+            if not cost_opt or current_price < 2/60 or laxity == 0:
                 
-                pass
-
-            else:   
+                history.append((current_time, current_task.name, current_price))
                 # 3. Calcul du coût (basé sur la Figure 1 de votre document)
                 cost_multiplier = get_cost_at_hour(current_time, tariff_model)
                 total_cost += cost_multiplier
@@ -87,31 +96,71 @@ def simulate(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
                     active_tasks.remove(current_task)
                     completed_tasks.append(current_task)
 
-
-
-
         current_time += 1
-    print("End time:", current_time)
+    print("Simulation completed in", time.time() - start_loop_time, "seconds.")
+    print("End time:", round(current_time/60,2), "hours")
+    print("Total cost:", round (total_cost,2))
     print("Completed tasks:" , len(completed_tasks)/total_inital_tasks * 100, "%")
-    return total_cost
+
+    return history
     
     
+
+def plot_gantt(history):
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    task_colors = {}
+    color_index = 0
+    colors = plt.cm.get_cmap('tab20', len(set([h[1] for h in history])))
+
+    for time, task_name, price in history:
+        if task_name not in task_colors:
+            task_colors[task_name] = colors(color_index)
+            color_index += 1
+        ax.broken_barh([(time, 1)], (0, 5), facecolors=task_colors[task_name])
+
+    ax.set_ylim(0, 5)
+    ax.set_xlim(0, max([h[0] for h in history]) + 1)
+    ax.set_xlabel('Time')
+    ax.set_yticks([])
+    
+
+    # Create legend
+    patches = [mpatches.Patch(color=color, label=task) for task, color in task_colors.items()]
+    plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    plt.show()
+
+
+
 tasks_list = [
-    Task("T1", arrival_time=0, execution_time=4, deadline=10),
+    Task("T1", arrival_time=0, execution_time=4.5, deadline=10),
     Task("T2", arrival_time=2, execution_time=3, deadline=8),
     Task("T3", arrival_time=4, execution_time=2, deadline=12),
     Task("T4", arrival_time=6, execution_time=1, deadline=9),
-    Task("T5", arrival_time=8, execution_time=2, deadline=15),
+    Task("T5", arrival_time=8, execution_time=2.3, deadline=15),
     Task("T6", arrival_time=1, execution_time=5, deadline=14),
-    Task("T7", arrival_time=3, execution_time=2, deadline=11),
+    Task("T7", arrival_time=3, execution_time=2.2, deadline=11),
     Task("T8", arrival_time=5, execution_time=3, deadline=13),
-    Task("T9", arrival_time=7, execution_time=4, deadline=16)
+    Task("T9", arrival_time=7, execution_time=4.6, deadline=16)
 ]
+
+
 
 l1=copy.deepcopy(tasks_list)
 l2=copy.deepcopy(tasks_list)
 
 
-print("Total cost with EDF:", simulate(l1,strategy="EDF", tariff_model=3,cost_opt=False))
+#plot_gantt(simulate(l1,strategy="EDF", tariff_model=3,cost_opt=False))
 
-print("Total cost with LLF:", simulate(l2,strategy="LLF", tariff_model=3,cost_opt=False))
+#print("Total cost with LLF:", simulate(l2,strategy="LLF", tariff_model=3,cost_opt=False))
+
+#plot_gantt(simulate(l1,strategy="EDF", tariff_model=3,cost_opt=True))
+
+#plot_gantt(simulate(l2,strategy="LLF", tariff_model=3,cost_opt=True))
+
+plot_gantt(simulate(l1,strategy="EDF", tariff_model=3,cost_opt=False))
+plot_gantt(simulate(l2,strategy="LLF", tariff_model=3,cost_opt=False))
