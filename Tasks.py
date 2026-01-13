@@ -2,6 +2,8 @@
 import copy
 import time
 
+from matplotlib import ticker
+
 
 class Task:
     def __init__(self, name, arrival_time, execution_time, deadline):
@@ -58,7 +60,6 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
     
     # Simulation pas à pas
     while tasks_list or active_tasks:
-        
         #Ajout des tâches qui viennent d'arriver
         new_arrivals = [t for t in tasks_list if t.arrival_time == current_time] #Tâches arrivant à l'instant t
         active_tasks.extend(new_arrivals)
@@ -87,7 +88,7 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
             #Econoime de coût si on peut retarder l'exécution
             if not cost_opt or current_price < 2/60 or laxity == 0:
                 
-                history.append((current_time, current_task.name, current_price))
+                history.append((current_time, current_task.name, current_price*60))
                 #Ajout du coût (par minute)
                 cost_multiplier = get_cost_at_hour(current_time, tariff_model)
                 total_cost += cost_multiplier
@@ -108,7 +109,7 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
     return history
     
     
-def simulate_rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=120):
+def rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=120):
     current_time = 0
     completed_tasks = []
     active_tasks = []
@@ -118,6 +119,7 @@ def simulate_rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon
     history = []
     
     while tasks_list or active_tasks:
+        
         #Arrivée des tâches
         new_arrivals = [t for t in tasks_list if t.arrival_time == current_time]
         active_tasks.extend(new_arrivals)
@@ -181,16 +183,19 @@ def plot_gantt(history):
 
     task_colors = {}
     color_index = 0
-    colors = plt.cm.get_cmap('tab20', len(set([h[1] for h in history])))
+    colors = plt.get_cmap('tab20', len(set([h[1] for h in history])))
 
     for time, task_name, price in history:
         if task_name not in task_colors:
             task_colors[task_name] = colors(color_index)
             color_index += 1
-        ax.broken_barh([(time, 1)], (0, 5), facecolors=task_colors[task_name])
+        ax.broken_barh([(time, 1)], (0, price), facecolors=task_colors[task_name])
 
-    ax.set_ylim(0, 5)
+    ax.set_ylim(0, max([h[2] for h in history]) + 1)
     ax.set_xlim(0, max([h[0] for h in history]) + 1)
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
+    formatter = ticker.FuncFormatter(lambda x, pos: f'{int(x/60)}')
+    ax.xaxis.set_major_formatter(formatter)
     ax.set_xlabel('Time')
     ax.set_yticks([])
     
@@ -219,7 +224,7 @@ tasks_list = [
 l1=copy.deepcopy(tasks_list)
 l2=copy.deepcopy(tasks_list)
 
-plot_gantt(greedy(l1, strategy="EDF", tariff_model=3, cost_opt=True))
-plot_gantt(simulate_rolling_horizon(l2, strategy="EDF", tariff_model=3, horizon_minutes=120))
+plot_gantt(greedy(l1, strategy="EDF", tariff_model=2, cost_opt=True))
+#plot_gantt(rolling_horizon(l2, strategy="EDF", tariff_model=2, horizon_minutes=120))
 
 
