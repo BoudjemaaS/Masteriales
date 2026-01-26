@@ -3,15 +3,18 @@ import copy
 import time
 
 from matplotlib import ticker
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 
+tariff_model = 3  # Modèle tarifaire par défaut
 
 class Task:
     def __init__(self, name, arrival_time, execution_time, deadline):
         self.name = name # Nom de la tâche
-        self.arrival_time = round(arrival_time * 60,2) # Date d'arrivée de la tâche
-        self.execution_time = round(execution_time * 60,2)  # Temps d'exécution total de la tâche
-        self.remaining_time = round(execution_time * 60,2) # Temps d'exécution restant
-        self.deadline = round(deadline * 60,2) # Échéance de la tâche
+        self.arrival_time = round(arrival_time * 60) # Date d'arrivée de la tâche
+        self.execution_time = round(execution_time * 60)  # Temps d'exécution total de la tâche
+        self.remaining_time = round(execution_time * 60) # Temps d'exécution restant
+        self.deadline = round(deadline * 60) # Échéance de la tâche
 
     def get_laxity(self, current_time):
         # Laxité = (Échéance - Temps actuel) - Temps d'exécution restant
@@ -46,7 +49,7 @@ def get_cost_at_hour(hour, tariff_model):
     return price/60  # Convertir en coût par minute
 
 
-def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
+def greedy(tasks_list, strategy="EDF",tariff_model=tariff_model,cost_opt=False):
     #Algorithme d'ordonnancement glouton avec optimisation de coût optionnelle
 
     current_time = 0 #Début de la simulation
@@ -67,7 +70,7 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
 
 
         # Si (Temps actuel + Temps restant > Deadline), la tâche est condamnée et supprimée
-        missed = [t for t in active_tasks if (current_time + t.remaining_time) > t.deadline]
+        missed = [t for t in active_tasks[:] if (current_time + t.remaining_time) > t.deadline]
         for t in missed:
             failed_tasks.append(t)
             active_tasks.remove(t)
@@ -79,8 +82,11 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
             elif strategy == "LLF":
                 active_tasks.sort(key=lambda x: x.get_laxity(current_time))
 
-            current_task = active_tasks[0]
+
+
             
+                
+            current_task = active_tasks[0]
 
             current_price = get_cost_at_hour(current_time, tariff_model)
             laxity = current_task.get_laxity(current_time)
@@ -98,6 +104,7 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
                 if current_task.remaining_time == 0:
                     active_tasks.remove(current_task)
                     completed_tasks.append(current_task)
+                
 
         current_time += 1
 
@@ -108,8 +115,7 @@ def greedy(tasks_list, strategy="EDF",tariff_model=3,cost_opt=False):
 
     return history
     
-    
-def rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=120):
+def rolling_horizon(tasks_list, strategy="EDF", tariff_model=tariff_model):
     current_time = 0
     completed_tasks = []
     active_tasks = []
@@ -132,6 +138,7 @@ def rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=
             active_tasks.remove(t)
 
         if active_tasks:
+            
             # Tri selon la stratégie
             if strategy == "EDF":
                 active_tasks.sort(key=lambda x: x.deadline)
@@ -139,22 +146,19 @@ def rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=
                 active_tasks.sort(key=lambda x: x.get_laxity(current_time))
 
             current_task = active_tasks[0]
-            
-            
+            horizon= current_task.deadline - current_time
+        
             # On regarde le prix futur dans l'horizon choisi
             current_price = get_cost_at_hour(current_time, tariff_model)
             
             # On cherche s'il y a un prix plus bas dans l'horizon
             future_prices = [get_cost_at_hour(current_time + offset, tariff_model) 
-                             for offset in range(1, horizon_minutes + 1)]
+                             for offset in range(1, horizon + 1)]
             min_future_price = min(future_prices)
             
             laxity = current_task.get_laxity(current_time)
 
-            # DÉCISION : On exécute si :
-            # - On est déjà au prix minimum de l'horizon
-            # - OU la laxité est nulle (Urgence absolue)
-            # - OU le prix actuel est acceptable (OffPeak)
+      
             if current_price <= min_future_price or laxity == 0 or current_price <= (1/60):
                 # Exécution
                 total_cost += current_price
@@ -175,11 +179,14 @@ def rolling_horizon(tasks_list, strategy="EDF", tariff_model=3, horizon_minutes=
 
     return history
 
-def plot_gantt(history):
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as mpatches
+def plot_gantt(history, ax=None):
+    
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(24, 6))
+        show_plot = True
+    else:
+        show_plot = False
 
     task_colors = {}
     color_index = 0
@@ -204,27 +211,176 @@ def plot_gantt(history):
     patches = [mpatches.Patch(color=color, label=task) for task, color in task_colors.items()]
     plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc='upper left')
 
-    plt.show()
+    if show_plot:
+        plt.tight_layout()
+        plt.show()
+
+def plot_cost_profile(tariff_model, max_hours=24, ax=None):
+    """
+    Affiche la courbe des coûts.
+    """
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(24, 4))
+        show_plot = True
+    else:
+        show_plot = False
+
+    # Génération des données minute par minute
+    minutes = list(range(0, max_hours * 60))
+    costs = [get_cost_at_hour(m, tariff_model) * 60 for m in minutes]
+    
+    ax.plot(minutes, costs, drawstyle='steps-post', color='tab:red', linewidth=2, label=f'Tariff Model {tariff_model}')
+    
+    ax.set_ylim(0, 4)
+    ax.set_yticks([1, 2, 3])
+    ax.set_yticklabels(["Off (1)", "Mid (2)", "Peak (3)"])
+    ax.grid(True, linestyle='--', alpha=0.6)
+    ax.legend(loc='upper right') # Utiliser ax.legend
+    
+
+    if show_plot:
+        # Si on affiche seul, on formate l'axe X ici
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(60))
+        formatter = ticker.FuncFormatter(lambda x, pos: f'{int(x/60)}h')
+        ax.xaxis.set_major_formatter(formatter)
+        plt.show()
+
+
+def online_full_tasks():
+    
+    current_time = 0 #Début de la simulation
+    completed_tasks = [] #Liste des tâches complétées
+    active_tasks = [] #Liste des tâches actives
+    failed_tasks = [] #Liste des tâches échouées
+    total_cost = 0 #Coût total de l'ordonnancement 
+    total_inital_tasks = len(tasks_list) #Nombre total de tâches initiales
+    history = [] #Historique des taches pour le diagramme de Gantt
+    start_loop_time = time.time()
+    new_arrivals = [t for t in tasks_list if t.arrival_time <= current_time] #Tâches arrivant à l'instant t
+    waiting_tasks = []
+
+    while tasks_list or active_tasks:
+        #Ajout des tâches qui viennent d'arriver
+        active_tasks.extend(new_arrivals)
+        for t in new_arrivals: tasks_list.remove(t)
+
+
+        # Si (Temps actuel + Temps restant > Deadline), la tâche est condamnée et supprimée
+        missed = [t for t in active_tasks[:] if (current_time + t.remaining_time) > t.deadline]
+        for t in missed:
+            failed_tasks.append(t)
+            active_tasks.remove(t)
+
+        active_tasks.sort(key=lambda x: x.execution_time)
+
+        if active_tasks:
+            current_task = active_tasks[0]
+            do_break = False
+
+
+            while current_task.remaining_time > 0:
+                total_cost += get_cost_at_hour(current_time, tariff_model)
+                history.append((current_time, current_task.name, get_cost_at_hour(current_time, tariff_model)*60))
+                new_arrivals = [t for t in tasks_list if t.arrival_time <= current_time] #Tâches arrivant à l'instant t
+                
+                active_tasks.extend(new_arrivals)
+                active_tasks.sort(key=lambda x: x.execution_time)
+              
+                
+                
+                for t in new_arrivals:
+                    tasks_list.remove(t)
+
+                if len(new_arrivals) > 1:
+                   
+                    if active_tasks[0].execution_time+active_tasks[1].execution_time <= current_task.remaining_time:
+                        current_task.execution_time= current_task.remaining_time
+                        print(current_task.remaining_time,current_task.execution_time)
+                        new_arrivals.append(current_task)
+                        current_task = active_tasks[0]
+                
+                
+                current_task.remaining_time -= 1
+
+                
+                
+
+
+                current_time += 1
+
+
+            if current_task.remaining_time == 0:
+                active_tasks.remove(current_task)
+                completed_tasks.append(current_task)
+
+        else:
+            current_time +=1 
+               
+    print("Simulation completed in", time.time() - start_loop_time, "seconds.")
+    print("End time:", round(current_time/60,2), "hours")
+    print("Total cost:", round (total_cost,2))
+    print("Completed tasks:" , len(completed_tasks)/total_inital_tasks * 100, "%")
+    print("completed tasks:", [t.name for t in completed_tasks])
+    print("Failed tasks:", [t.name for t in failed_tasks])
+
+    return history
+
+
+
+
+
+
+
+
 
 
 
 tasks_list = [
-    Task("T1", arrival_time=0, execution_time=4.5, deadline=10),
-    Task("T2", arrival_time=2, execution_time=3, deadline=8),
+    Task("T1", arrival_time=0, execution_time=2.5, deadline=10),
+
+    Task("T10"  , arrival_time=0.5, execution_time=1, deadline=7),
+    Task("T11"  , arrival_time=0.5, execution_time=1, deadline=9),
+    #Task("T12"  , arrival_time=0.6, execution_time=0.2, deadline=8),
+    #Task("T13"  , arrival_time=0.6, execution_time=0.2, deadline=8),
+    Task("T7", arrival_time=3.5, execution_time=2.2, deadline=11),
+    Task("T14", arrival_time=3.5, execution_time=2.2, deadline=11),
+
     Task("T3", arrival_time=4, execution_time=2, deadline=12),
+
+
     Task("T4", arrival_time=6, execution_time=1, deadline=9),
-    Task("T5", arrival_time=8, execution_time=2.3, deadline=15),
+
+
+    Task("T5", arrival_time=8, execution_time=2.3, deadline=12),
+
+
+
+
+
     Task("T6", arrival_time=1, execution_time=5, deadline=14),
-    Task("T7", arrival_time=3, execution_time=2.2, deadline=11),
+    Task("T2", arrival_time=2, execution_time=3, deadline=8),
     Task("T8", arrival_time=5, execution_time=3, deadline=13),
     Task("T9", arrival_time=7, execution_time=4.6, deadline=16)
+
+
+
+
+    
+
 ]
 
 
 l1=copy.deepcopy(tasks_list)
 l2=copy.deepcopy(tasks_list)
 
-plot_gantt(greedy(l1, strategy="EDF", tariff_model=2, cost_opt=True))
-#plot_gantt(rolling_horizon(l2, strategy="EDF", tariff_model=2, horizon_minutes=120))
 
 
+history = online_full_tasks()
+
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(13, 8), sharex=True, gridspec_kw={'height_ratios': [1, 3]})
+plt.subplots_adjust(hspace=0.1)
+
+plot_cost_profile(tariff_model=tariff_model, max_hours=24, ax=ax1) # Dessine en haut
+plot_gantt(history, ax=ax2)
+plt.show()
