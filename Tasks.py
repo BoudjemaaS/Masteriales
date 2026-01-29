@@ -83,8 +83,6 @@ def greedy(tasks_list, strategy="EDF",tariff_model=tariff_model,cost_opt=False):
                 active_tasks.sort(key=lambda x: x.get_laxity(current_time))
 
 
-
-            
                 
             current_task = active_tasks[0]
 
@@ -257,13 +255,11 @@ def online_full_tasks():
     history = [] #Historique des taches pour le diagramme de Gantt
     start_loop_time = time.time()
     new_arrivals = [t for t in tasks_list if t.arrival_time <= current_time] #Tâches arrivant à l'instant t
-    waiting_tasks = []
 
     while tasks_list or active_tasks:
         #Ajout des tâches qui viennent d'arriver
         active_tasks.extend(new_arrivals)
         for t in new_arrivals: tasks_list.remove(t)
-
 
         # Si (Temps actuel + Temps restant > Deadline), la tâche est condamnée et supprimée
         missed = [t for t in active_tasks[:] if (current_time + t.remaining_time) > t.deadline]
@@ -271,43 +267,55 @@ def online_full_tasks():
             failed_tasks.append(t)
             active_tasks.remove(t)
 
-        active_tasks.sort(key=lambda x: x.execution_time)
+        
 
         if active_tasks:
+            active_tasks.sort(key=lambda x: x.deadline)
             current_task = active_tasks[0]
-            do_break = False
-
+           
+            
 
             while current_task.remaining_time > 0:
-                total_cost += get_cost_at_hour(current_time, tariff_model)
-                history.append((current_time, current_task.name, get_cost_at_hour(current_time, tariff_model)*60))
+                
+                delay = False
+
+
                 new_arrivals = [t for t in tasks_list if t.arrival_time <= current_time] #Tâches arrivant à l'instant t
-                
                 active_tasks.extend(new_arrivals)
-                active_tasks.sort(key=lambda x: x.execution_time)
-              
-                
-                
+                active_tasks.sort(key=lambda x: x.deadline)
                 for t in new_arrivals:
                     tasks_list.remove(t)
 
                 if len(new_arrivals) > 1:
                    
+                    new_arrivals.sort(key=lambda x: x.deadline)
                     if active_tasks[0].execution_time+active_tasks[1].execution_time <= current_task.remaining_time:
                         current_task.execution_time= current_task.remaining_time
                         print(current_task.remaining_time,current_task.execution_time)
                         new_arrivals.append(current_task)
                         current_task = active_tasks[0]
-                
-                
-                current_task.remaining_time -= 1
-
-                
-                
 
 
-                current_time += 1
+                window = [get_cost_at_hour(h, tariff_model) for h in range(current_time, current_task.deadline)]
+                #print("window",window)
 
+                min_cost = min ([get_cost_at_hour(h, tariff_model) for h in range(current_time, current_task.deadline)])
+                #print("cost",get_cost_at_hour(current_time, tariff_model), min_cost)
+                if get_cost_at_hour(current_time, tariff_model) > min_cost and current_task.get_laxity(current_time) > 0:
+                    print("delay")
+                    delay = True
+                    active_tasks.sort(key=lambda x: x.deadline)
+                    current_task=active_tasks[0]
+                    print("current task", current_task.name)
+                    
+                if not delay:
+                    total_cost += get_cost_at_hour(current_time, tariff_model)
+                    history.append((current_time, current_task.name, get_cost_at_hour(current_time, tariff_model)*60))
+                    current_task.remaining_time -= 1
+                    current_time += 1
+
+                else:
+                    current_time += 1
 
             if current_task.remaining_time == 0:
                 active_tasks.remove(current_task)
@@ -331,41 +339,21 @@ def online_full_tasks():
 
 
 
-
-
-
-
 tasks_list = [
     Task("T1", arrival_time=0, execution_time=2.5, deadline=10),
-
     Task("T10"  , arrival_time=0.5, execution_time=1, deadline=7),
     Task("T11"  , arrival_time=0.5, execution_time=1, deadline=9),
-    #Task("T12"  , arrival_time=0.6, execution_time=0.2, deadline=8),
-    #Task("T13"  , arrival_time=0.6, execution_time=0.2, deadline=8),
     Task("T7", arrival_time=3.5, execution_time=2.2, deadline=11),
-    Task("T14", arrival_time=3.5, execution_time=2.2, deadline=11),
-
-    Task("T3", arrival_time=4, execution_time=2, deadline=12),
-
-
+    Task("T2", arrival_time=2, execution_time=3, deadline=8),
+    Task("T9", arrival_time=7, execution_time=4.6, deadline=18),
     Task("T4", arrival_time=6, execution_time=1, deadline=9),
 
-
+    Task("T14", arrival_time=3.5, execution_time=2.2, deadline=11),
+    Task("T3", arrival_time=4, execution_time=2, deadline=12),
     Task("T5", arrival_time=8, execution_time=2.3, deadline=12),
-
-
-
-
-
     Task("T6", arrival_time=1, execution_time=5, deadline=14),
-    Task("T2", arrival_time=2, execution_time=3, deadline=8),
-    Task("T8", arrival_time=5, execution_time=3, deadline=13),
-    Task("T9", arrival_time=7, execution_time=4.6, deadline=16)
+    Task("T8", arrival_time=5, execution_time=2, deadline=13)
 
-
-
-
-    
 
 ]
 
