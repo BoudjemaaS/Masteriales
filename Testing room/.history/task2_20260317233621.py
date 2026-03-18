@@ -90,7 +90,7 @@ def greedy(tasks_list, strategy="EDF",tariff_model=tariff_model,cost_opt=False):
             current_price = get_cost_at_hour(current_time, tariff_model)
             laxity = current_task.get_laxity(current_time)
 
-            #Economie de coût si on peut retarder l'exécution
+            #Econoime de coût si on peut retarder l'exécution
             if not cost_opt or current_price < 2/60 or laxity == 0:
                 
                 history.append((current_time, current_task.name, current_price*60))

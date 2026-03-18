@@ -86,7 +86,7 @@ def run_benchmark():
         # 2. Test Greedy EDF (task2.py)
         print("\n--- 2. GREEDY EDF (Sans opti coût) ---")
         tasks_greedy = copy.deepcopy(tasks)
-        # On capture la sortie console standard de la fonction greedy
+        # On capture la sortie console standard de ta fonction greedy
         history_greedy = greedy(tasks_greedy, strategy="EDF", tariff_model=MODEL_TARIFAIRE_INT, cost_opt=False)
 
         # 3. Test Rolling Horizon (task2.py)
@@ -94,6 +94,9 @@ def run_benchmark():
         tasks_rh = copy.deepcopy(tasks)
         history_rh = rolling_horizon(tasks_rh, strategy="EDF", tariff_model=MODEL_TARIFAIRE_INT)
 
+        # Note: Si tu veux aussi tester online_full_tasks() de Tasks.py, il faudra légèrement
+        # adapter la fonction dans ton fichier Tasks.py car elle utilise une variable globale `tasks_list`
+        # au lieu de la prendre en paramètre. 
 
 if __name__ == "__main__":
     run_benchmark()

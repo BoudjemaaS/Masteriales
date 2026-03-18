@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import math
 
+# --- 1. MODÉLISATION (ADAPTÉE À VOTRE SYNTAXE) ---
 
 class Task:
     def __init__(self, name, arrival_time, execution_time, deadline):
@@ -157,12 +158,14 @@ def run_custom_scenario():
     profile.add_interval(17, 20, P_MID)
     profile.add_interval(20, 24, P_OFF)
 
-    
+    # 2. VOS TÂCHES ICI (Copiez-collez votre liste)
     tasks_list = [
         Task("T1", arrival_time=0, execution_time=1.5, deadline=10),
         Task("T10", arrival_time=0.5, execution_time=1, deadline=7),
         Task("T2", arrival_time=2, execution_time=2, deadline=12),
         Task("T4", arrival_time=5, execution_time=3, deadline=15),
+        # Vous pouvez ajouter d'autres tâches ici...
+        # Task("T3", arrival_time=16.5, execution_time=1.5, deadline=20),
     ]
 
     # 3. Lancer l'algo
