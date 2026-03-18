@@ -1,0 +1,62 @@
+L'ordonnancement en ligne est un problème majeur dans de nombreux domaines tels que les systèmes informatiques ou les chaînes de production. 
+Ce problème se caractérise par une arrivée progressive des tâches à accomplir, sans en connaître la totalité. L’idée étant de prendre une décision sur le moment, afin de savoir comment organiser les tâches présente en fonction des objectifs à atteindre. 
+Il existe des algorithmes qui permettent d’optimiser différents critères comme la date de fin ou le somme des temps de complétion. 
+Dans notre cas, le problème est complexifié, puisque nous avons affaire à un problème bi-critère. Notre objectif est de terminer un maximum de tâche tout en tenant compte d’une tarification dite TOU (Time Of Use). L’idée est de facturer l’utilisation d’une machine exécutant une tâche, en fonction du temps d’utilisation et de l'horaire d’utilisation. 
+Deux problèmes majeurs apparaissent: Dans un premier temps, le problème est en ligne, ce qui signifie qu’il n’est pas possible d’avoir une vue d’ensemble de ce dernier afin d’avoir un ordonnancement le plus proche possible de l’optimal. Dans un second temps, les deux critères à optimiser se contredisent l'un l’autre. En effet, maximiser le nombre de tâches terminées implique d’augmenter le coût d’utilisation. Il faut donc trouver un ordre d'importance entre ces deux critères afin de trouver un compromis optimal.
+
+
+Nous avons commencé par étudier les algorithmes existant pour organiser les taches en fonction des critères choisis.
+Par la suite, nous avons élaboré un algorithme permettant d’obtenir un ordonnancement qui se rapproche d’une solution optimale, pour terminer le maximum de tâches, tout en minimisant le coût d’utilisation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Etude des algos existants :
+
+Dans un premier temps, une tâche est définie par 4 attributs:
+Son nom
+Sa date d’arrivée
+Sa durée
+Sa deadline
+
+Afin d’organiser au mieux nos tâches et rendre notre simulation plus réaliste, notre système avancé minute par minute, car utiliser des heures entières permettait moins de modification de l’ordonnancement. 
+
+On considère, pour être plus souple et peut être plus adaptatif, que les tâches sélectionnées peuvent être préemptées. De cette manière, les deux algos suivants peuvent mettre à jour la tâche à exécuter si nécessaire, sans être bloqué par la durée de la tâche actuelle.
+
+
+EDF (Earliest Deadline First):
+
+ Le principe est basé sur le traitement de “l’urgence absolue”. EDF est une politique d'ordonnancement qui priorise la tâche dont la deadline est la plus proche. A chaque pas de temps, le système évalue la tâche avec la plus haute priorité et change si cela est nécessaire. Le changement se fait lorsqu'une nouvelle tâche arrive parmi les tâches à réaliser. 
+
+
+LLF (Least Laxity First):
+
+Le principe de cet algorithme est de prioriser les tâches en fonction de leur laxité. C'est-à-dire la marge de manœuvre permettant de terminer la tâche dans les délais impartis.
+		Laxity = deadline - current time - remaining time
+Un tel algorithme aura tendance à réaliser beaucoup d'interruptions dans le cas de tâches préemptibles, puisque a chaque pas de temps une mise à jour est faite, le remaining time change, ce qui fait que la laxité aussi. 
+
+
+Ces deux algorithmes permettent de former une base d’étude qui nous permet d’élaborer un algorithme bi-critère. En effet, il ne tiennent pas compte de la notion de tarification, les taches sont placées dès qu’elles sont disponibles, ce qui fait que le coût est maximal en permanence. 
+
+
+
